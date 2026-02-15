@@ -35,9 +35,9 @@ class ALike {
 
  public:
   ALike() = default;
-  ALike(int x) : x_(x) {};
-  ALike(std::string_view name) : name_(name) {};
-  ALike(int x, std::string_view name) : x_(x), name_(name) {};
+  ALike(int x) : x_(x){};
+  ALike(std::string_view name) : name_(name){};
+  ALike(int x, std::string_view name) : x_(x), name_(name){};
 
   std::string_view name() const { return name_; }
 
