@@ -1,4 +1,4 @@
-name: Clang Tidy
+name: Include What You Use
 
 on:
   schedule:
