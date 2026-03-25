@@ -30,7 +30,7 @@ find_program(IWYU_EXECUTABLE
 
 macro(_iwyu_log)
     if(NOT IWYU_QUIET)
-        message(STATUS "Morpheus: ${ARGV0}")
+        message(STATUS "xyz: ${ARGV0}")
     endif()
 endmacro()
 
