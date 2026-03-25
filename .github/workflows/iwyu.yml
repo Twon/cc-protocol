@@ -28,7 +28,7 @@ env:
   COMPILER_VERSION: 21
 
 jobs:
-  clang-tidy:
+  include-what-you-use:
     # The CMake configure and build commands are platform agnostic and should work equally
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
