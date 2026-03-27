@@ -56,22 +56,108 @@ these protocols maintain value semantics, enforce const-propagation, and provide
 full allocator awareness, consistent with the design principles of P3019
 (`std::polymorphic`).
 
+Furthermore, while nominal subtyping naturally allows for non-owning polymorphic
+views via simple raw pointers or references (e.g., `Base*` or `Base&`),
+structural subtyping lacks a native language equivalent. To pass an object to a
+function expecting a structural interface without transferring ownership or
+triggering an allocation (a deep copy), a non-owning type-erased wrapper is
+required. We propose `protocol_view` to fill this role. `protocol_view` acts
+as a lightweight, zero-overhead reference to any structurally conforming type,
+analogous to `std::span`.
+
+## Examples
+
+The following examples demonstrate the use of `protocol` for ownership and
+`protocol_view` for non-owning observation using a conceptual `Drawable`
+interface. Note that `Circle` does not inherit from `Drawable`; it satisfies the
+interface structurally.
+
+```cpp
+struct Drawable {
+  std::string_view name() const;
+  void draw();
+  int draw_count() const;
+};
+
+struct Circle {
+  std::string_view name() const { return "Circle"; }
+  void draw() { ++draw_count_; }
+  int draw_count() const { return draw_count_; }
+
+private:
+  int draw_count_ = 0;
+};
+```
+
+### `protocol` and value semantics
+
+`xyz::protocol<I>` owns its contained object and provides value semantics.
+Copying a `protocol` object performs a deep copy of the underlying type.
+
+```cpp
+// Construct in-place
+xyz::protocol<Drawable> p1(std::in_place_type<Circle>);
+
+// p2 is a deep copy of p1, including the underlying Circle object
+xyz::protocol<Drawable> p2 = p1;
+
+p1.draw();
+p1.draw();
+
+// p1 and p2 are independent
+assert(p1.draw_count() == 2);
+assert(p2.draw_count() == 0);
+```
+
+### `protocol_view` and reference semantics
+
+`xyz::protocol_view<I>` is a non-owning view of any type that satisfies the
+interface `I`. It is analogous to `std::span`.
+
+```cpp
+void print_name(xyz::protocol_view<const Drawable> view) {
+  // const view only allows calling const member functions
+  std::cout << "Name: " << view.name() << "\n";
+}
+
+Circle circle;
+
+// View a concrete object directly without allocation or ownership transfer
+print_name(circle);
+
+xyz::protocol<Drawable> p(std::in_place_type<Circle>);
+
+// View an owning protocol object
+print_name(p);
+
+// Copying a view is a shallow operation
+xyz::protocol_view<Drawable> v1(circle);
+xyz::protocol_view<Drawable> v2 = v1; // v2 points to the same 'circle' as v1
+v2.draw();
+assert(circle.draw_count() == 1);
+```
+
 ## Design requirements
 
-The proposed protocol facility is guided by several core design requirements. It
-must allow types to satisfy an interface based solely on the presence of
+`protocol` must allow types to satisfy an interface based solely on the presence of
 conforming member functions and signatures, without requiring explicit
-inheritance. Protocols must provide value semantics, where copying a protocol
+inheritance. `protocol` must provide value semantics, where copying a `protocol`
 object performs a deep copy of the underlying erased type.
 
+To support efficient observation at function boundaries without allocation or
+ownership transfer, the facility must generate a non-owning `protocol_view`.
+This view must be constructible from any structurally conforming type (including
+the owning `protocol` itself) and route method calls through a synthesized
+vtable.
+
 Const correctness must be strictly maintained; a const-qualified protocol object
-must only permit the invocation of const-qualified member functions on the
-underlying erased object. The implementation of the type-erased wrapper should
-be generated automatically by the compiler using reflection, eliminating the
-need for manual boilerplate. The wrapper must be fully allocator-aware, properly
-supporting `std::allocator_traits`. Finally, to support efficient move
-operations without necessarily allocating memory, the protocol must define a
-valueless-after-move state.
+or a `protocol_view<const I>` must only permit the invocation of const-qualified
+member functions on the underlying erased object. The implementation of the
+type-erased wrappers should be generated automatically by the compiler using
+reflection, eliminating the need for manual boilerplate. The owning protocol
+must be fully allocator-aware, properly supporting `std::allocator_traits`.
+Finally, to support efficient move operations without necessarily allocating
+memory, the owning `protocol` must define a valueless-after-move state.
 
 ## Impact on the standard library
 
